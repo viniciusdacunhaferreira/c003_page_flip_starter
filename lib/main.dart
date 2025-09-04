@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
 import 'package:vector_graphics/vector_graphics.dart';
 
@@ -10,11 +12,11 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         body: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           // Use Center as layout has unconstrained width (loose constraints),
           // together with SizedBox to specify the max width (tight constraints)
           // See this thread for more info:
@@ -32,13 +34,103 @@ class MainApp extends StatelessWidget {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  HomePage({super.key});
+
+  final pageFlipKey = GlobalKey<PageFlipBuilderState>();
 
   @override
   Widget build(BuildContext context) {
-    // TODO: Create PageFlipBuilder widget that can be used to flip between
-    // LightHomePage and DarkHomePage
-    return const LightHomePage();
+    return PageFlipBuilder(
+      key: pageFlipKey,
+      frontBuilder: (_) => LightHomePage(
+        onFlip: () => pageFlipKey.currentState?.flip(),
+      ),
+      backBuilder: (_) => DarkHomePage(
+        onFlip: () => pageFlipKey.currentState?.flip(),
+      ),
+    );
+  }
+}
+
+class PageFlipBuilder extends StatefulWidget {
+  const PageFlipBuilder({
+    super.key,
+    required this.frontBuilder,
+    required this.backBuilder,
+  });
+  final WidgetBuilder frontBuilder;
+  final WidgetBuilder backBuilder;
+
+  @override
+  PageFlipBuilderState createState() => PageFlipBuilderState();
+}
+
+// Note: there's no underscore here as we want this State subclass to be public.
+// This is so that we can call the flip() method from the outside.
+class PageFlipBuilderState extends State<PageFlipBuilder>
+    with SingleTickerProviderStateMixin {
+  bool _inFrontSide = true;
+
+  late final AnimationController _controller;
+
+  void _updateStatus(AnimationStatus status) {
+    if (status == AnimationStatus.completed ||
+        status == AnimationStatus.dismissed) {
+      setState(() => _inFrontSide = !_inFrontSide);
+    }
+  }
+
+  void flip() {
+    if (_inFrontSide) {
+      _controller.forward();
+    } else {
+      _controller.reverse();
+    }
+  }
+
+  @override
+  void initState() {
+    _controller = AnimationController(
+      vsync: this,
+      duration: Durations.extralong4,
+    )..addStatusListener(_updateStatus);
+
+    super.initState();
+  }
+
+  @override
+  void dispose() {
+    _controller.removeStatusListener(_updateStatus);
+    _controller.dispose();
+
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, _) {
+        final bool inFrontSide = _controller.value < 0.5;
+
+        final child = inFrontSide
+            ? widget.frontBuilder(context)
+            : widget.backBuilder(context);
+
+        final rotation =
+            inFrontSide ? _controller.value * pi : pi - pi * _controller.value;
+
+        var tilt = (_controller.value - 0.5).abs() - 0.5;
+
+        tilt *= inFrontSide ? -0.003 : 0.003;
+
+        return Transform(
+          transform: Matrix4.rotationY(rotation)..setEntry(3, 0, tilt),
+          alignment: Alignment.center,
+          child: child,
+        );
+      },
+    );
   }
 }
 
