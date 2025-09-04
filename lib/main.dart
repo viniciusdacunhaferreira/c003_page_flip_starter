@@ -69,22 +69,38 @@ class PageFlipBuilder extends StatefulWidget {
 // This is so that we can call the flip() method from the outside.
 class PageFlipBuilderState extends State<PageFlipBuilder>
     with SingleTickerProviderStateMixin {
-  bool _inFrontSide = true;
-
   late final AnimationController _controller;
 
-  void _updateStatus(AnimationStatus status) {
-    if (status == AnimationStatus.completed ||
-        status == AnimationStatus.dismissed) {
-      setState(() => _inFrontSide = !_inFrontSide);
-    }
+  bool get inFrontSide => _controller.value < 0.5;
+
+  void _handleHorizontalDragUpdate(DragUpdateDetails details) {
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final delta = details.primaryDelta;
+
+    _controller.value += delta! / screenWidth;
+  }
+
+  void _handleHorizontalDragEnd(_) {
+    !_controller.isCompleted && !_controller.isDismissed ? flip() : null;
   }
 
   void flip() {
-    if (_inFrontSide) {
-      _controller.forward();
+    debugPrint('\n_controller.isCompleted = ${_controller.isCompleted}');
+    debugPrint('_controller.isDismissed = ${_controller.isDismissed}');
+    debugPrint('_controller.value != ${_controller.value != 1.0}\n');
+
+    if (inFrontSide) {
+      if (_controller.isDismissed) {
+        _controller.forward();
+      } else {
+        _controller.reverse();
+      }
     } else {
-      _controller.reverse();
+      if (_controller.isCompleted) {
+        _controller.reverse();
+      } else {
+        _controller.forward();
+      }
     }
   }
 
@@ -92,15 +108,14 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
   void initState() {
     _controller = AnimationController(
       vsync: this,
-      duration: Durations.extralong4,
-    )..addStatusListener(_updateStatus);
+      duration: Durations.short4,
+    );
 
     super.initState();
   }
 
   @override
   void dispose() {
-    _controller.removeStatusListener(_updateStatus);
     _controller.dispose();
 
     super.dispose();
@@ -108,28 +123,30 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        final bool inFrontSide = _controller.value < 0.5;
+    return GestureDetector(
+      onHorizontalDragUpdate: _handleHorizontalDragUpdate,
+      onHorizontalDragEnd: _handleHorizontalDragEnd,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final value = _controller.value;
+          final child = inFrontSide
+              ? widget.frontBuilder(context)
+              : widget.backBuilder(context);
 
-        final child = inFrontSide
-            ? widget.frontBuilder(context)
-            : widget.backBuilder(context);
+          final rotation = inFrontSide ? value * pi : pi - pi * value;
 
-        final rotation =
-            inFrontSide ? _controller.value * pi : pi - pi * _controller.value;
+          var tilt = (_controller.value - 0.5).abs() - 0.5;
 
-        var tilt = (_controller.value - 0.5).abs() - 0.5;
+          tilt *= inFrontSide ? -0.003 : 0.003;
 
-        tilt *= inFrontSide ? -0.003 : 0.003;
-
-        return Transform(
-          transform: Matrix4.rotationY(rotation)..setEntry(3, 0, tilt),
-          alignment: Alignment.center,
-          child: child,
-        );
-      },
+          return Transform(
+            transform: Matrix4.rotationY(rotation)..setEntry(3, 0, tilt),
+            alignment: Alignment.center,
+            child: child,
+          );
+        },
+      ),
     );
   }
 }
