@@ -71,35 +71,44 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
-  bool get inFrontSide => _controller.value < 0.5;
+  bool get _inFrontSide => _controller.value.abs() < 0.5;
 
   void _handleHorizontalDragUpdate(DragUpdateDetails details) {
-    final screenWidth = MediaQuery.sizeOf(context).width;
-    final delta = details.primaryDelta;
+    final double screenWidth = MediaQuery.sizeOf(context).width;
+    final double delta = details.primaryDelta!;
 
-    _controller.value += delta! / screenWidth;
+    if (_controller.value == 1 && !delta.isNegative) _controller.value = -1;
+    if (_controller.value == -1 && delta.isNegative) _controller.value = 1;
+
+    _controller.value += delta / screenWidth;
   }
 
   void _handleHorizontalDragEnd(_) {
     !_controller.isCompleted && !_controller.isDismissed ? flip() : null;
   }
 
-  void flip() {
+  void flip() async {
     debugPrint('\n_controller.isCompleted = ${_controller.isCompleted}');
     debugPrint('_controller.isDismissed = ${_controller.isDismissed}');
-    debugPrint('_controller.value != ${_controller.value != 1.0}\n');
+    debugPrint('_controller.value = ${_controller.value}');
+    debugPrint('_controller.value != 1.0 = ${_controller.value != 1.0}\n');
 
-    if (inFrontSide) {
-      if (_controller.isDismissed) {
-        _controller.forward();
+    if (_inFrontSide) {
+      if (_controller.value == 0) {
+        _controller.animateTo(1);
       } else {
-        _controller.reverse();
+        _controller.animateTo(0);
       }
     } else {
-      if (_controller.isCompleted) {
-        _controller.reverse();
+      if (_controller.value == 1) {
+        _controller.value = -1;
+        _controller.animateTo(0);
+      } else if (_controller.value == -1) {
+        _controller.animateTo(0);
+      } else if (_controller.value.isNegative) {
+        _controller.animateTo(-1);
       } else {
-        _controller.forward();
+        _controller.animateTo(1);
       }
     }
   }
@@ -108,7 +117,10 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
   void initState() {
     _controller = AnimationController(
       vsync: this,
-      duration: Durations.short4,
+      duration: Durations.long4,
+      lowerBound: -1,
+      upperBound: 1,
+      value: 0,
     );
 
     super.initState();
@@ -130,18 +142,32 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
         animation: _controller,
         builder: (context, _) {
           final value = _controller.value;
-          final child = inFrontSide
+          final child = _inFrontSide
               ? widget.frontBuilder(context)
               : widget.backBuilder(context);
 
-          final rotation = inFrontSide ? value * pi : pi - pi * value;
+          double getTilt() {
+            var tilt = (value - 0.5).abs() - 0.5;
+            if (value < -0.5) {
+              tilt = 1.0 + value;
+            }
+            return tilt * (_inFrontSide ? -0.003 : 0.003);
+          }
 
-          var tilt = (_controller.value - 0.5).abs() - 0.5;
-
-          tilt *= inFrontSide ? -0.003 : 0.003;
+          double rotationAngle() {
+            final rotationValue = value * pi;
+            if (value > 0.5) {
+              return pi - rotationValue; // input from 0.5 to 1.0
+            } else if (value > -0.5) {
+              return rotationValue; // input from -0.5 to 0.5
+            } else {
+              return -pi - rotationValue; // input from -1.0 to -0.5
+            }
+          }
 
           return Transform(
-            transform: Matrix4.rotationY(rotation)..setEntry(3, 0, tilt),
+            transform: Matrix4.rotationY(rotationAngle())
+              ..setEntry(3, 0, getTilt()),
             alignment: Alignment.center,
             child: child,
           );
