@@ -71,6 +71,9 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
+  static const kDuration = Duration(seconds: 1);
+  static const kCurve = Easing.linear;
+
   bool get _inFrontSide => _controller.value.abs() < 0.5;
 
   void _handleHorizontalDragUpdate(DragUpdateDetails details) {
@@ -83,32 +86,59 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
     _controller.value += delta / screenWidth;
   }
 
-  void _handleHorizontalDragEnd(_) {
-    !_controller.isCompleted && !_controller.isDismissed ? flip() : null;
+  void _handleHorizontalDragEnd(DragEndDetails details) {
+    final double velocity = details.velocity.pixelsPerSecond.dx;
+
+    if (velocity == 0 &&
+        (_controller.value == -1 ||
+            _controller.value == 1 ||
+            _controller.value == 0)) {
+      return;
+    }
+
+    if (velocity.abs() > 1000) {
+      if (velocity.isNegative) {
+        if (_inFrontSide) {
+          _controller.animateTo(-1, curve: kCurve, duration: kDuration);
+        } else {
+          _controller.animateTo(0, curve: kCurve, duration: kDuration);
+        }
+      } else {
+        if (_inFrontSide) {
+          _controller.animateTo(1, curve: kCurve, duration: kDuration);
+        } else {
+          _controller.animateTo(0, curve: kCurve, duration: kDuration);
+        }
+      }
+    } else {
+      flip();
+    }
   }
 
-  void flip() async {
+  void flip() {
     debugPrint('\n_controller.isCompleted = ${_controller.isCompleted}');
     debugPrint('_controller.isDismissed = ${_controller.isDismissed}');
     debugPrint('_controller.value = ${_controller.value}');
     debugPrint('_controller.value != 1.0 = ${_controller.value != 1.0}\n');
 
+    if (_controller.isAnimating) return;
+
     if (_inFrontSide) {
       if (_controller.value == 0) {
-        _controller.animateTo(1);
+        _controller.animateTo(1, curve: kCurve, duration: kDuration);
       } else {
-        _controller.animateTo(0);
+        _controller.animateTo(0, curve: kCurve, duration: kDuration);
       }
     } else {
       if (_controller.value == 1) {
         _controller.value = -1;
-        _controller.animateTo(0);
+        _controller.animateTo(0, curve: kCurve, duration: kDuration);
       } else if (_controller.value == -1) {
-        _controller.animateTo(0);
+        _controller.animateTo(0, curve: kCurve, duration: kDuration);
       } else if (_controller.value.isNegative) {
-        _controller.animateTo(-1);
+        _controller.animateTo(-1, curve: kCurve, duration: kDuration);
       } else {
-        _controller.animateTo(1);
+        _controller.animateTo(1, curve: kCurve, duration: kDuration);
       }
     }
   }
@@ -117,7 +147,7 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
   void initState() {
     _controller = AnimationController(
       vsync: this,
-      duration: Durations.long4,
+      duration: kDuration,
       lowerBound: -1,
       upperBound: 1,
       value: 0,
