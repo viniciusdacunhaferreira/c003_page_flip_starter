@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:vector_graphics/vector_graphics.dart';
+import 'package:page_flip/page_flip_builder.dart';
 
 void main() {
   runApp(const MainApp());
@@ -10,11 +11,11 @@ class MainApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
       debugShowCheckedModeBanner: false,
       home: Scaffold(
         body: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           // Use Center as layout has unconstrained width (loose constraints),
           // together with SizedBox to specify the max width (tight constraints)
           // See this thread for more info:
@@ -32,13 +33,23 @@ class MainApp extends StatelessWidget {
 }
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  HomePage({super.key});
 
+  final pageFlipKey = GlobalKey<PageFlipBuilderState>();
   @override
   Widget build(BuildContext context) {
-    // TODO: Create PageFlipBuilder widget that can be used to flip between
-    // LightHomePage and DarkHomePage
-    return const LightHomePage();
+    return PageFlipBuilder(
+      key: pageFlipKey,
+      frontBuilder: (_) => LightHomePage(
+        onFlip: () => pageFlipKey.currentState?.flip(),
+      ),
+      backBuilder: (_) => DarkHomePage(
+        onFlip: () => pageFlipKey.currentState?.flip(),
+      ),
+      maxTilt: 0.003,
+      maxScale: 0.2,
+      onFlipComplete: (isFrontSide) => debugPrint('front: $isFrontSide'),
+    );
   }
 }
 
