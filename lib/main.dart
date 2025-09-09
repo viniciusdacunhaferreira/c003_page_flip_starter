@@ -71,7 +71,7 @@ class PageFlipBuilderState extends State<PageFlipBuilder>
     with SingleTickerProviderStateMixin {
   late final AnimationController _controller;
 
-  static const kDuration = Duration(seconds: 1);
+  static const kDuration = Durations.short4;
   static const kCurve = Easing.linear;
 
   bool get _inFrontSide => _controller.value.abs() < 0.5;
